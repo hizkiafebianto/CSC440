@@ -7,5 +7,6 @@ Thumbs.db
 *.sublime-workspace
 *.sublime-projects
 sftp-config.json
+*.csv
 
 
