@@ -10,23 +10,28 @@ import numpy as np
 import nltk
 import re
 import skipthoughts
+import h5py
 import collections
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from keras.layers import Input, Embedding, merge, Flatten, Dense, SimpleRNN
 from keras.models import Model
+from keras.preprocessing import sequence
 
 
 
 tokenizer = RegexpTokenizer(r'\w+')
 model_skipthoughts = skipthoughts.load_model()
+max_news_length = 700
+embedding_dim = 4800
 
 
 def read_csv(filepath):
+	global n_news
 	f = open(filepath)
 	csv_f = list(csv.reader(f))
 	news = list()
-	for row in csv_f[1:2]:
+	for row in csv_f[1:]:
 		news.append(list(row[2:]))
 	return news
 
@@ -39,17 +44,36 @@ def string_clean(sentence):
 
 
 def news_to_sentences(newslist):
-	max_length = 0
 	sentences = list()
 	for news in newslist:
 		sentence = list()
 		for headline in news:
 			sentence += string_clean(headline)
-		if len(sentence) > max_length:
-			max_length = len(sentence)
 		sentences.append(sentence)
-	return sentences, max_length
+	return sentences
 
+
+def word_embedding(newslist):
+	embed_news = list()
+	sentences = news_to_sentences(newslist)
+	for sentence in sentences[0:1]:
+		vector = skipthoughts.encode(model_skipthoughts, sentence)
+		vector_pad = np.zeros((max_news_length, embedding_dim))
+		vector_pad[:vector.shape[0],:vector.shape[1]] = vector
+		embed_news.append(vector_pad)
+	return embed_news
+
+
+def save_hdf5(data):
+	with h5py.File('embednews.h5', mode = 'w') as hf:
+		hf.create_dataset('data', data = data)
+
+
+def load_hdf5(filename):
+	with h5py.File(filename, 'r') as hf:
+		data = hf.get('data')
+		numpy_array = np.array(data)
+	return numpy_array
 
 
 def main():
@@ -105,12 +129,13 @@ def main():
 		print('{}: {}'.format(idx2word[i], embeddings[i]))
 
 if __name__ == "__main__":
-	# nltk.download()
-	newslist = read_csv(sys.argv[1])
-	sentences, max_length = news_to_sentences(newslist)
-	vectors = skipthoughts.encode(model_skipthoughts, sentences)
-	# print vectors
+	
+	# newslist = read_csv(sys.argv[1])
+	# embed_news = word_embedding(newslist)
+	# save_hdf5(embed_news)
+	# embed_news = load_hdf5('embednews.h5')
 
-	# word_corpus(newslist)
-	# main()
+
+
+
 	
