@@ -92,7 +92,7 @@ def encode(model, X, use_norm=True, verbose=True, batch_size=128, use_eos=False)
     Encode sentences in the list X. Each entry will return a vector
     """
     # first, do preprocessing
-    X = preprocess(X)
+    # X = preprocess(X)
 
     # word dictionary and init
     d = defaultdict(lambda : 0)
@@ -421,5 +421,4 @@ def gru_layer(tparams, state_below, options, prefix='gru', mask=None, **kwargs):
                                 strict=True)
     rval = [rval]
     return rval
-
 
