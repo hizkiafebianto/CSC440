@@ -1,3 +1,4 @@
+from __future__ import division
 import csv
 import sys
 import itertools
@@ -27,8 +28,7 @@ embedding_dim = 32
 max_news = 1989
 
 
-def read_csv(filepath):
-	global n_news
+def read_news(filepath):
 	f = open(filepath)
 	csv_f = list(csv.reader(f))
 	newslist = list()
@@ -36,6 +36,20 @@ def read_csv(filepath):
 		newslist.append(list(row[2:]))
 	return newslist
 
+def read_stock(filepath):
+	f = open(filepath)
+	csv_f = list(csv.reader(f))
+	stockprices = list()
+	for row in csv_f[1:]:
+		stockprices.append((float(row[1]), float(row[4])))
+	return stockprices
+
+def stock_process(stockprices):
+	values = list()
+	for open_price, close_price in stockprices:
+		r = (close_price - open_price) / open_price
+		values.append(r > 0)
+	return values
 
 def string_clean(sentence):
 	sentence = re.sub("[^a-zA-Z]"," ", sentence)
@@ -132,10 +146,11 @@ def main():
 
 if __name__ == "__main__":
 	
-	newslist = read_csv(sys.argv[1])
-	sentences = news_to_sentences(newslist)
-	sentences_array = sentences_to_nparray(sentences)
-	print sentences_array
+	# newslist = read_news(sys.argv[1])
+	stockprices = read_stock(sys.argv[1])
+	values = stock_process(stockprices)
+	print values
+
 
 
 
