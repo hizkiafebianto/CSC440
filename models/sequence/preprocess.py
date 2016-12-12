@@ -26,7 +26,7 @@ stop_words = set(stopwords.words('english'))
 max_news_length = 350
 embedding_dim = 32
 max_news = 1989
-
+total_words = 32136
 
 def read_news(filepath):
 	f = open(filepath)
@@ -48,8 +48,13 @@ def stock_process(stockprices):
 	values = list()
 	for open_price, close_price in stockprices:
 		r = (close_price - open_price) / open_price
-		values.append(r > 0)
-	return values
+		if r > 0:
+			value = 1
+		else:
+			value = 0
+		values.append(value)
+	is_increase = np.asarray([values], dtype='int32').T
+	return is_increase
 
 def string_clean(sentence):
 	sentence = re.sub("[^a-zA-Z]"," ", sentence)
@@ -146,10 +151,12 @@ def main():
 
 if __name__ == "__main__":
 	
-	# newslist = read_news(sys.argv[1])
-	stockprices = read_stock(sys.argv[1])
-	values = stock_process(stockprices)
-	print values
+	newslist = read_news(sys.argv[1])
+	sentences = news_to_sentences(newslist)
+	sentences_array = sentences_to_nparray(sentences)
+	# stockprices = read_stock(sys.argv[1])
+	# is_increase = stock_process(stockprices)
+
 
 
 
