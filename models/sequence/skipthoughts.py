@@ -20,8 +20,8 @@ profile = False
 #-----------------------------------------------------------------------------#
 # Specify model and table locations here
 #-----------------------------------------------------------------------------#
-path_to_models = '/Users/yuewang/Desktop/CSC440/models/skipthought/'
-path_to_tables = '/Users/yuewang/Desktop/CSC440/models/skipthought/'
+path_to_models = 'D:/MBA Journey/2016 - Fall Quarter/CSC240 - Data Mining/Project 2/CSC440/'
+path_to_tables = 'D:/MBA Journey/2016 - Fall Quarter/CSC240 - Data Mining/Project 2/CSC440/'
 #-----------------------------------------------------------------------------#
 
 path_to_umodel = path_to_models + 'uni_skip.npz'
