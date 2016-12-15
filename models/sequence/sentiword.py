@@ -8,10 +8,16 @@ Created on Mon Dec 12 18:04:28 2016
 import pandas as pd
 import numpy as np
 import os 
+import matplotlib.pyplot as plt
+import math
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.corpus import sentiwordnet as swn
-from collections import defaultdict
+from keras.layers import LSTM, Input, Dense, merge, Reshape
+from keras.models import Model
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
+
 
 # LOADING DATASET
 os.getcwd() # Setting directory
@@ -164,5 +170,125 @@ vad_df1.loc[0]
 vad_df2.loc[0]
 
 # NEURAL NETWORK MODEL
+# SentiWordNet Scores
+# headline input, meant to receive sequences of 50 integers
+scores_input = Input(shape=(50,), dtype="float32", name='swn_scores')
+
+# the second input is a sequence of DJIA index for each day. 
+djia_input = Input(shape=(1,), dtype="float32", name="djia_index")
+
+# Two encoder layers
+encoder_1 = Dense(10, activation='relu')(scores_input)
+encoder_2 = Dense(10, activation='relu')(djia_input)
+
+# LSTM layers
+x = merge([encoder_1,encoder_2], mode='concat')
+x = Reshape((1, 20))(x)
+lstm = LSTM(4, return_sequences=False, dropout_W=0.5)(x)
+
+# Add a logistic regression on top
+predictions = Dense(1)(lstm)
+
+# Compile neural network model
+model = Model(input=[scores_input, djia_input], output = predictions)
+model.compile(optimizer='adam',
+              loss = 'mae',
+              metrics=['accuracy'])
+
+# Train and Test Data
+# Before we split the data, we need to scale the values.
+scaler = MinMaxScaler(feature_range=(0,1))
+djia_scaled = scaler.fit_transform(djia_data.loc[:,'Close'])
+swn_df2_scaled = scaler.fit_transform(swn_df2)
+swn_df2_scaled[0:2]
+
+# We take data before 2015-01-01 for our training data set. There are 1611 
+# records for train data.
+train_size = int(len(data[data['Date']<'2015-01-01']))
+test_size = len(data.index) - train_size
+swn_train_Xs = swn_df2_scaled[0:(train_size-1),:]
+swn_train_Xd = djia_scaled[0:train_size-1]
+swn_train_y = djia_scaled[1:train_size]
+swn_test_Xs = swn_df2_scaled[train_size-1:len(data.index)-1,:]
+swn_test_Xd = djia_scaled[train_size-1:len(data.index)-1]
+swn_test_y = djia_scaled[train_size:len(data.index)]
+
+# Train the model
+model.fit({'swn_scores':swn_train_Xs, 'djia_index':swn_train_Xd},
+          swn_train_y,
+          nb_epoch = 20,
+          batch_size = 30,
+          verbose = 2)
+
+# Make predictions
+trainPredict = model.predict({'swn_scores':swn_train_Xs, 'djia_index':swn_train_Xd},
+                             batch_size = 30)
+testPredict = model.predict({'swn_scores':swn_test_Xs, 'djia_index':swn_test_Xd})      
+                             
+# Plot Results
+plt.plot(np.append(trainPredict,testPredict))
+plt.plot(djia_scaled)
+plt.show()
+
+
+# Using Vader scores
+# Neural Network Model
+scores_input_vad = Input(shape=(75,), dtype="float32", name='vad_scores') 
+djia_input_vad = Input(shape=(1,), dtype="float32", name="djia_index")
+encoder_1_vad = Dense(20, activation='relu')(scores_input_vad)
+encoder_2_vad = Dense(20, activation='relu')(djia_input_vad)
+# LSTM layers
+x_vad = merge([encoder_1_vad,encoder_2_vad], mode='concat')
+x_vad = Reshape((1, 40))(x_vad)
+lstm_vad = LSTM(4, return_sequences=False, dropout_W=0.2, dropout_U=0.2)(x_vad)
+# Add a logistic regression on top
+predictions_vad = Dense(1)(lstm_vad)
+# Compile neural network model
+model_vad = Model(input=[scores_input_vad, djia_input_vad], 
+                  output = predictions_vad)
+model_vad.compile(optimizer='adam',
+              loss = 'mae',
+              metrics=['accuracy'])
+
+# Create train and test data
+vad_df2_scaled = scaler.fit_transform(vad_df2)
+vad_df2_scaled[0:2]
+# We take data before 2015-01-01 for our training data set. There are 1611 
+# records for train data.
+vad_train_Xs = vad_df2_scaled[0:(train_size-1),:]
+vad_train_Xd = djia_scaled[0:train_size-1]
+vad_train_y = djia_scaled[1:train_size]
+vad_test_Xs = vad_df2_scaled[train_size-1:len(data.index)-1,:]
+vad_test_Xd = djia_scaled[train_size-1:len(data.index)-1]
+vad_test_y = djia_scaled[train_size:len(data.index)]
+
+# Train the model 
+model_vad.fit({'vad_scores':vad_train_Xs, 'djia_index':vad_train_Xd},
+              vad_train_y,
+              nb_epoch = 20,
+              batch_size = 30,
+              verbose = 2)
+
+# Make predictions
+trainPredict_vad = model_vad.predict({'vad_scores':vad_train_Xs, 'djia_index':vad_train_Xd},
+                             batch_size = 30)
+testPredict_vad = model_vad.predict({'vad_scores':vad_test_Xs, 'djia_index':vad_test_Xd})      
+                             
+# Plot Results
+plt.plot(np.append(trainPredict_vad,testPredict_vad))
+plt.plot(djia_scaled)
+plt.show()
+
+plt.plot(testPredict_vad)
+plt.show()
+
+
+
+
+
+
+
+
+
 
 
