@@ -10,10 +10,12 @@ import numpy as np
 import os 
 import matplotlib.pyplot as plt
 import math
+import datetime as dt
+import matplotlib.dates as mdates
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.corpus import sentiwordnet as swn
-from keras.layers import LSTM, Input, Dense, merge, Reshape
+from keras.layers import LSTM, Input, Dense, merge, Reshape, SimpleRNN
 from keras.models import Model
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
@@ -178,13 +180,13 @@ scores_input = Input(shape=(50,), dtype="float32", name='swn_scores')
 djia_input = Input(shape=(1,), dtype="float32", name="djia_index")
 
 # Two encoder layers
-encoder_1 = Dense(10, activation='relu')(scores_input)
-encoder_2 = Dense(10, activation='relu')(djia_input)
+encoder_1 = Dense(15, activation='relu')(scores_input)
+encoder_2 = Dense(15, activation='relu')(djia_input)
 
 # LSTM layers
 x = merge([encoder_1,encoder_2], mode='concat')
-x = Reshape((1, 20))(x)
-lstm = LSTM(4, return_sequences=False, dropout_W=0.5)(x)
+x = Reshape((1, 30))(x)
+lstm = LSTM(4, return_sequences=False, dropout_W=0.2, dropout_U=0.2)(x)
 
 # Add a logistic regression on top
 predictions = Dense(1)(lstm)
@@ -192,42 +194,45 @@ predictions = Dense(1)(lstm)
 # Compile neural network model
 model = Model(input=[scores_input, djia_input], output = predictions)
 model.compile(optimizer='adam',
-              loss = 'mae',
+              loss = 'mse',
               metrics=['accuracy'])
 
 # Train and Test Data
 # Before we split the data, we need to scale the values.
-scaler = MinMaxScaler(feature_range=(0,1))
-djia_scaled = scaler.fit_transform(djia_data.loc[:,'Close'])
-swn_df2_scaled = scaler.fit_transform(swn_df2)
-swn_df2_scaled[0:2]
+djia_scaler = MinMaxScaler(feature_range=(0,1))
+scores_scaler = MinMaxScaler(feature_range=(0,1))
+djia_scaled = djia_scaler.fit_transform(djia_data.loc[:,'Close'])
+swn_df2_scaled = scores_scaler.fit_transform(swn_df2)
 
 # We take data before 2015-01-01 for our training data set. There are 1611 
 # records for train data.
 train_size = int(len(data[data['Date']<'2015-01-01']))
 test_size = len(data.index) - train_size
-swn_train_Xs = swn_df2_scaled[0:(train_size-1),:]
-swn_train_Xd = djia_scaled[0:train_size-1]
-swn_train_y = djia_scaled[1:train_size]
-swn_test_Xs = swn_df2_scaled[train_size-1:len(data.index)-1,:]
-swn_test_Xd = djia_scaled[train_size-1:len(data.index)-1]
-swn_test_y = djia_scaled[train_size:len(data.index)]
+swn_train_Xs = swn_df2_scaled[test_size+1:len(data.index),:]
+swn_train_Xd = djia_scaled[test_size+1:len(data.index)]
+swn_train_y = djia_scaled[test_size:len(data.index)-1]
+swn_test_Xs = swn_df2_scaled[1:test_size+1,:]
+swn_test_Xd = djia_scaled[1:test_size+1]
+swn_test_y = djia_scaled[0:test_size]
+
 
 # Train the model
-model.fit({'swn_scores':swn_train_Xs, 'djia_index':swn_train_Xd},
-          swn_train_y,
-          nb_epoch = 20,
+# swn_train_Xs[::-1] for reversing the data to match the timeline
+model.fit({'swn_scores':swn_train_Xs[::-1], 'djia_index':swn_train_Xd[::-1]},
+          swn_train_y[::-1],
+          nb_epoch = 15,
           batch_size = 30,
           verbose = 2)
 
 # Make predictions
-trainPredict = model.predict({'swn_scores':swn_train_Xs, 'djia_index':swn_train_Xd},
+trainPredict = model.predict({'swn_scores':swn_train_Xs[::-1], 'djia_index':swn_train_Xd[::-1]},
                              batch_size = 30)
-testPredict = model.predict({'swn_scores':swn_test_Xs, 'djia_index':swn_test_Xd})      
-                             
+testPredict = model.predict({'swn_scores':swn_test_Xs[::-1], 'djia_index':swn_test_Xd[::-1]})      
+
 # Plot Results
-plt.plot(np.append(trainPredict,testPredict))
-plt.plot(djia_scaled)
+x = [dt.datetime.strptime(d,'%Y-%m-%d').date() for d in djia_data.loc[:,'Date']]
+plt.plot(x[1:],np.append(testPredict[::-1],trainPredict[::-1]))
+plt.plot(x,djia_scaled)
 plt.show()
 
 
@@ -251,44 +256,151 @@ model_vad.compile(optimizer='adam',
               metrics=['accuracy'])
 
 # Create train and test data
-vad_df2_scaled = scaler.fit_transform(vad_df2)
-vad_df2_scaled[0:2]
+vad_df2_scaled = scores_scaler.fit_transform(vad_df2)
+
 # We take data before 2015-01-01 for our training data set. There are 1611 
 # records for train data.
-vad_train_Xs = vad_df2_scaled[0:(train_size-1),:]
-vad_train_Xd = djia_scaled[0:train_size-1]
-vad_train_y = djia_scaled[1:train_size]
-vad_test_Xs = vad_df2_scaled[train_size-1:len(data.index)-1,:]
-vad_test_Xd = djia_scaled[train_size-1:len(data.index)-1]
-vad_test_y = djia_scaled[train_size:len(data.index)]
+vad_train_Xs = vad_df2_scaled[test_size+1:len(data.index),:]
+vad_train_Xd = djia_scaled[test_size+1:len(data.index)]
+vad_train_y = djia_scaled[test_size:len(data.index)-1]
+vad_test_Xs = vad_df2_scaled[1:test_size+1,:]
+vad_test_Xd = djia_scaled[1:test_size+1]
+vad_test_y = djia_scaled[0:test_size]
 
 # Train the model 
-model_vad.fit({'vad_scores':vad_train_Xs, 'djia_index':vad_train_Xd},
-              vad_train_y,
+model_vad.fit({'vad_scores':vad_train_Xs[::-1], 'djia_index':vad_train_Xd[::-1]},
+              vad_train_y[::-1],
               nb_epoch = 20,
               batch_size = 30,
               verbose = 2)
 
 # Make predictions
-trainPredict_vad = model_vad.predict({'vad_scores':vad_train_Xs, 'djia_index':vad_train_Xd},
-                             batch_size = 30)
-testPredict_vad = model_vad.predict({'vad_scores':vad_test_Xs, 'djia_index':vad_test_Xd})      
+trainPredict_vad = model_vad.predict({'vad_scores':vad_train_Xs[::-1], 
+                                      'djia_index':vad_train_Xd[::-1]},
+                                       batch_size = 30)
+testPredict_vad = model_vad.predict({'vad_scores':vad_test_Xs[::-1], 
+                                     'djia_index':vad_test_Xd[::-1]})      
                              
 # Plot Results
-plt.plot(np.append(trainPredict_vad,testPredict_vad))
-plt.plot(djia_scaled)
+x = [dt.datetime.strptime(d,'%Y-%m-%d').date() for d in djia_data.loc[:,'Date']]
+plt.plot(x[1:], np.append(testPredict_vad[::-1],trainPredict_vad[::-1]))
+plt.plot(x,djia_scaled)
 plt.show()
 
-plt.plot(testPredict_vad)
+
+# PERFORMANCE MEASUREMENT
+# Sentiword
+train_pred_swn = djia_scaler.inverse_transform(trainPredict[::-1])
+test_pred_swn = djia_scaler.inverse_transform(testPredict[::-1])
+train_swn = djia_scaler.inverse_transform(swn_train_y)
+test_swn = djia_scaler.inverse_transform(swn_test_y)
+train_swn_score = math.sqrt(mean_squared_error(train_pred_swn,train_swn))
+train_swn_score
+test_swn_score = math.sqrt(mean_squared_error(test_pred_swn,test_swn))
+test_swn_score
+
+# Vader 
+# Invert predictions
+train_pred_vad = djia_scaler.inverse_transform(trainPredict_vad[::-1])
+test_pred_vad = djia_scaler.inverse_transform(testPredict_vad[::-1])
+train_vad = djia_scaler.inverse_transform(vad_train_y)
+test_vad = djia_scaler.inverse_transform(vad_test_y)
+
+train_vad_score = math.sqrt(mean_squared_error(train_pred_vad,train_vad))
+train_vad_score
+test_vad_score = math.sqrt(mean_squared_error(test_pred_vad,test_vad))
+test_vad_score
+
+
+# SIMPLE RNN MODELS
+# SentiwordNet
+# Model
+scores_input_swnb = Input(shape=(50,), dtype="float32", name='swn_scores') 
+djia_input_swnb = Input(shape=(1,), dtype="float32", name="djia_index")
+encoder_1_swnb = Dense(15, activation='relu')(scores_input_swnb)
+encoder_2_swnb = Dense(15, activation='relu')(djia_input_swnb)
+# LSTM layers
+x_swnb = merge([encoder_1_swnb,encoder_2_swnb], mode='concat')
+x_swnb = Reshape((1, 30))(x_swnb)
+RNN_swnb = SimpleRNN(4, return_sequences=False, dropout_W=0.2, dropout_U=0.2)(x_swnb)
+# Add a logistic regression on top
+predictions_swnb = Dense(1)(RNN_swnb)
+# Compile neural network model
+model_swnb = Model(input=[scores_input_swnb, djia_input_swnb], 
+                  output = predictions_swnb)
+model_swnb.compile(optimizer='adam',
+              loss = 'mse',
+              metrics=['accuracy'])
+# Train the model
+model_swnb.fit({'swn_scores':swn_train_Xs[::-1], 'djia_index':swn_train_Xd[::-1]},
+          swn_train_y[::-1],
+          nb_epoch = 15,
+          batch_size = 30,
+          verbose = 2)
+# Make predictions
+trainPredict_swnb = model_swnb.predict({'swn_scores':swn_train_Xs[::-1], 
+                                        'djia_index':swn_train_Xd[::-1]},
+                                        batch_size = 30)
+testPredict_swnb = model_swnb.predict({'swn_scores':swn_test_Xs[::-1], 
+                                       'djia_index':swn_test_Xd[::-1]})      
+# Plot Results
+plt.plot(x[1:],np.append(testPredict_swnb[::-1],trainPredict_swnb[::-1]))
+plt.plot(x,djia_scaled)
 plt.show()
+# Mean squared error calculation
+train_pred_swnb = djia_scaler.inverse_transform(trainPredict_swnb[::-1])
+test_pred_swnb = djia_scaler.inverse_transform(testPredict_swnb[::-1])
+train_swnb = djia_scaler.inverse_transform(swn_train_y)
+test_swnb = djia_scaler.inverse_transform(swn_test_y)
+train_swnb_score = math.sqrt(mean_squared_error(train_pred_swnb,train_swnb))
+train_swnb_score
+test_swnb_score = math.sqrt(mean_squared_error(test_pred_swnb,test_swnb))
+test_swnb_score
 
 
 
+# Vader
+scores_input_vadb = Input(shape=(75,), dtype="float32", name='vad_scores') 
+djia_input_vadb = Input(shape=(1,), dtype="float32", name="djia_index")
+encoder_1_vadb = Dense(20, activation='relu')(scores_input_vadb)
+encoder_2_vadb = Dense(20, activation='relu')(djia_input_vadb)
+# LSTM layers
+x_vadb = merge([encoder_1_vadb,encoder_2_vadb], mode='concat')
+x_vadb = Reshape((1, 40))(x_vadb)
+RNN_vadb = SimpleRNN(4, return_sequences=False, dropout_W=0.2, dropout_U=0.2)(x_vadb)
+# Add a logistic regression on top
+predictions_vadb = Dense(1)(RNN_vadb)
+# Compile neural network model
+model_vadb = Model(input=[scores_input_vadb, djia_input_vadb], 
+                  output = predictions_vadb)
+model_vadb.compile(optimizer='adam',
+              loss = 'mse',
+              metrics=['accuracy'])
+model_vadb.fit({'vad_scores':vad_train_Xs[::-1], 'djia_index':vad_train_Xd[::-1]},
+              vad_train_y[::-1],
+              nb_epoch = 20,
+              batch_size = 30,
+              verbose = 2)
+# Make predictions
+trainPredict_vadb = model_vadb.predict({'vad_scores':vad_train_Xs[::-1], 
+                                        'djia_index':vad_train_Xd[::-1]},
+                                        batch_size = 30)
+testPredict_vadb = model_vadb.predict({'vad_scores':vad_test_Xs[::-1],
+                                       'djia_index':vad_test_Xd[::-1]})                          
+# Plot Results
+plt.plot(x[1:],np.append(testPredict_vadb[::-1],trainPredict_vadb[::-1]))
+plt.plot(x,djia_scaled)
+plt.show() 
+# Mean squared error calculation
+train_pred_vadb = djia_scaler.inverse_transform(trainPredict_vadb[::-1])
+test_pred_vadb = djia_scaler.inverse_transform(testPredict_vadb[::-1])
+train_vadb = djia_scaler.inverse_transform(swn_train_y)
+test_vadb = djia_scaler.inverse_transform(swn_test_y)
+train_vadb_score = math.sqrt(mean_squared_error(train_pred_vadb,train_vadb))
+train_vadb_score
+test_vadb_score = math.sqrt(mean_squared_error(test_pred_vadb,test_vadb))
+test_vadb_score      
 
-
-
-
-
-
+# LSTM MODEL WITHOUT NEWS HEADLINES AS INPUTS
 
 
