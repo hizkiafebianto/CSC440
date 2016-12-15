@@ -16,7 +16,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.corpus import sentiwordnet as swn
 from keras.layers import LSTM, Input, Dense, merge, Reshape, SimpleRNN
-from keras.models import Model
+from keras.models import Model, Sequential
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 
@@ -218,11 +218,14 @@ swn_test_y = djia_scaled[0:test_size]
 
 # Train the model
 # swn_train_Xs[::-1] for reversing the data to match the timeline
+start = dt.datetime.now()
 model.fit({'swn_scores':swn_train_Xs[::-1], 'djia_index':swn_train_Xd[::-1]},
           swn_train_y[::-1],
           nb_epoch = 15,
           batch_size = 30,
           verbose = 2)
+runtime_swn = dt.datetime.now() - start
+print(runtime_swn)
 
 # Make predictions
 trainPredict = model.predict({'swn_scores':swn_train_Xs[::-1], 'djia_index':swn_train_Xd[::-1]},
@@ -230,7 +233,7 @@ trainPredict = model.predict({'swn_scores':swn_train_Xs[::-1], 'djia_index':swn_
 testPredict = model.predict({'swn_scores':swn_test_Xs[::-1], 'djia_index':swn_test_Xd[::-1]})      
 
 # Plot Results
-x = [dt.datetime.strptime(d,'%Y-%m-%d').date() for d in djia_data.loc[:,'Date']]
+x = [dt.datetime.strptime(dm,'%Y-%m-%d').date() for dm in djia_data.loc[:,'Date']]
 plt.plot(x[1:],np.append(testPredict[::-1],trainPredict[::-1]))
 plt.plot(x,djia_scaled)
 plt.show()
@@ -268,11 +271,14 @@ vad_test_Xd = djia_scaled[1:test_size+1]
 vad_test_y = djia_scaled[0:test_size]
 
 # Train the model 
+start = dt.datetime.now()
 model_vad.fit({'vad_scores':vad_train_Xs[::-1], 'djia_index':vad_train_Xd[::-1]},
               vad_train_y[::-1],
               nb_epoch = 20,
               batch_size = 30,
               verbose = 2)
+runtime_vad = dt.datetime.now() - start
+print(runtime_vad)
 
 # Make predictions
 trainPredict_vad = model_vad.predict({'vad_scores':vad_train_Xs[::-1], 
@@ -282,7 +288,6 @@ testPredict_vad = model_vad.predict({'vad_scores':vad_test_Xs[::-1],
                                      'djia_index':vad_test_Xd[::-1]})      
                              
 # Plot Results
-x = [dt.datetime.strptime(d,'%Y-%m-%d').date() for d in djia_data.loc[:,'Date']]
 plt.plot(x[1:], np.append(testPredict_vad[::-1],trainPredict_vad[::-1]))
 plt.plot(x,djia_scaled)
 plt.show()
@@ -332,11 +337,14 @@ model_swnb.compile(optimizer='adam',
               loss = 'mse',
               metrics=['accuracy'])
 # Train the model
+start = dt.datetime.now()
 model_swnb.fit({'swn_scores':swn_train_Xs[::-1], 'djia_index':swn_train_Xd[::-1]},
           swn_train_y[::-1],
           nb_epoch = 15,
           batch_size = 30,
           verbose = 2)
+runtime_swnb = dt.datetime.now()-start
+print(runtime_swnb)
 # Make predictions
 trainPredict_swnb = model_swnb.predict({'swn_scores':swn_train_Xs[::-1], 
                                         'djia_index':swn_train_Xd[::-1]},
@@ -376,11 +384,15 @@ model_vadb = Model(input=[scores_input_vadb, djia_input_vadb],
 model_vadb.compile(optimizer='adam',
               loss = 'mse',
               metrics=['accuracy'])
+start = dt.datetime.now()
 model_vadb.fit({'vad_scores':vad_train_Xs[::-1], 'djia_index':vad_train_Xd[::-1]},
               vad_train_y[::-1],
               nb_epoch = 20,
               batch_size = 30,
               verbose = 2)
+runtime_vadb = dt.datetime.now()-start
+print(runtime_vadb)
+
 # Make predictions
 trainPredict_vadb = model_vadb.predict({'vad_scores':vad_train_Xs[::-1], 
                                         'djia_index':vad_train_Xd[::-1]},
@@ -402,5 +414,75 @@ test_vadb_score = math.sqrt(mean_squared_error(test_pred_vadb,test_vadb))
 test_vadb_score      
 
 # LSTM MODEL WITHOUT NEWS HEADLINES AS INPUTS
+dataset = djia_data.values[:,4:5].astype("float32")
+djia_scaled = djia_scaler.fit_transform(dataset)
+train = djia_scaled[test_size+1:len(djia_scaled)]
+test = djia_scaled[1:test_size+1]
+trainY = djia_scaled[test_size:len(djia_scaled)-1] 
+testY = djia_scaled[0:test_size]
+
+# Reshape the dataset for LSTM
+train = np.reshape(train, (train.shape[0],1,train.shape[1]))
+test = np.reshape(test, (test.shape[0],1,1))
+
+# Sequential model with LSTM
+model_LSTM = Sequential()
+model_LSTM.add(LSTM(4, input_dim=1, return_sequences = False))
+model_LSTM.add(Dense(1))
+model_LSTM.compile(loss="mse", optimizer="adam")
+start = dt.datetime.now()
+model_LSTM.fit(train[::-1], trainY[::-1], nb_epoch=20, batch_size = 30, verbose=2)
+runtime_LSTM = dt.datetime.now()-start
+print(runtime_LSTM)
+
+# Make predictions
+trPredict = model_LSTM.predict(train[::-1])
+tsPredict = model_LSTM.predict(test[::-1])
+# plot
+plt.plot(x[1:],np.append(tsPredict[::-1],trPredict[::-1]))
+plt.plot(x,djia_scaled)
+plt.show
+
+# Performance measurement
+train_pred_LSTM = djia_scaler.inverse_transform(trPredict[::-1])
+test_pred_LSTM = djia_scaler.inverse_transform(tsPredict[::-1])
+train_LSTM = djia_scaler.inverse_transform(swn_train_y) 
+test_LSTM = djia_scaler.inverse_transform(swn_test_y)
+train_LSTM_score = math.sqrt(mean_squared_error(train_pred_LSTM,train_LSTM))
+train_LSTM_score
+test_LSTM_score = math.sqrt(mean_squared_error(test_pred_LSTM,test_LSTM))
+test_LSTM_score
+
+plt.plot(x[1:],np.append(test_pred_LSTM,train_pred_LSTM))
+plt.plot(x[:-1],np.append(test_LSTM,train_LSTM))
+
+# Sequential model with SimpleRNN
+model_RNN = Sequential()
+model_RNN.add(SimpleRNN(4, input_dim=1, return_sequences = False))
+model_RNN.add(Dense(1))
+model_RNN.compile(loss="mse", optimizer="adam")
+start = dt.datetime.now()
+model_RNN.fit(train[::-1], trainY[::-1], nb_epoch=20, batch_size = 30, verbose=2)
+runtime_RNN = dt.datetime.now()-start
+print(runtime_RNN)
+
+# Make predictions
+trPredict_RNN = model_RNN.predict(train[::-1])
+tsPredict_RNN = model_RNN.predict(test[::-1])
+# plot
+plt.plot(x[1:],np.append(tsPredict_RNN[::-1],trPredict_RNN[::-1]))
+plt.plot(x,djia_scaled)
+plt.show
+
+# Performance measurement
+train_pred_RNN = djia_scaler.inverse_transform(trPredict_RNN[::-1])
+test_pred_RNN = djia_scaler.inverse_transform(tsPredict_RNN[::-1])
+train_RNN = djia_scaler.inverse_transform(swn_train_y) 
+test_RNN = djia_scaler.inverse_transform(swn_test_y)
+train_RNN_score = math.sqrt(mean_squared_error(train_pred_RNN,train_RNN))
+train_RNN_score
+test_RNN_score = math.sqrt(mean_squared_error(test_pred_RNN,test_RNN))
+test_RNN_score
+
 
 
