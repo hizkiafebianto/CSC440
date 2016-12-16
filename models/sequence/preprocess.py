@@ -16,6 +16,8 @@ from keras.models import Model
 from keras.preprocessing import sequence
 from keras.datasets import imdb
 from nltk.corpus import stopwords
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
 
 
 
@@ -27,6 +29,10 @@ max_news_length = 350
 embedding_dim = 32
 max_news = 1989
 total_words = 32136
+look_back = 1
+
+
+
 
 def read_news(filepath):
 	f = open(filepath)
@@ -44,17 +50,38 @@ def read_stock(filepath):
 		stockprices.append((float(row[1]), float(row[4])))
 	return stockprices
 
+def read_price(filepath):
+	f = open(filepath)
+	csv_f = list(csv.reader(f))
+	stockprices = list()
+	for row in csv_f[1:]:
+		stockprices.append(float(row[4]))
+	return stockprices
+
 def stock_process(stockprices):
 	values = list()
 	for open_price, close_price in stockprices:
-		r = (close_price - open_price) / open_price
-		if r > 0:
+		r = (close_price - open_price) * 100 / open_price
+		if r >= 1:
+			value = 2
+		elif r < 1 and r > -1:
 			value = 1
 		else:
 			value = 0
 		values.append(value)
 	is_increase = np.asarray([values], dtype='int32').T
-	return is_increase
+	return is_increase[::-1]
+
+
+def data_process(stockprices, look_back = 1):
+	hisprice, predictprice = [], []
+	for i in range(len(stockprices) - look_back):
+		hisprice.append(stockprices[i : (i + look_back)])
+		predictprice.append(stockprices[i + look_back])
+	hisprice = np.asarray(hisprice)
+	predictprice = np.asarray(predictprice)
+	return hisprice, predictprice
+
 
 def string_clean(sentence):
 	sentence = re.sub("[^a-zA-Z]"," ", sentence)
@@ -151,11 +178,14 @@ def main():
 
 if __name__ == "__main__":
 	
-	newslist = read_news(sys.argv[1])
-	sentences = news_to_sentences(newslist)
-	sentences_array = sentences_to_nparray(sentences)
-	# stockprices = read_stock(sys.argv[1])
-	# is_increase = stock_process(stockprices)
+	# newslist = read_news(sys.argv[1])
+	# sentences = news_to_sentences(newslist)
+	# sentences_array = sentences_to_nparray(sentences)
+	stockprices = read_stock(sys.argv[1])
+	is_increase = stock_process(stockprices)
+
+
+
 
 
 
