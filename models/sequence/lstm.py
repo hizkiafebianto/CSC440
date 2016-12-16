@@ -29,11 +29,11 @@ import math
 seed = 7
 np.random.seed(seed)
 max_news_length = 350
-embedding_vecor_length = 32
+embedding_vecor_length = 8
 top_words = 32136
 look_back = 1
 scaler = MinMaxScaler(feature_range=(0, 1))
-
+# scaler_news = MinMaxScaler(feature_range=(0, 1))
 
 '''
 Reference: https://github.com/ryankiros/skip-thoughts
@@ -56,6 +56,7 @@ def load_data_nonclass(filepath_news, filepath_stock):
 	prices = preprocess.read_price(filepath_stock)
 	prices = scaler.fit_transform(prices)
 	news = preprocess.sentences_to_nparray(sentences)
+	# news = scaler_news.fit_transform(news)
 	hisprice, y = preprocess.data_process(prices, look_back)
 	return news[look_back:], hisprice, y
 
@@ -101,8 +102,8 @@ def train_model_convnet(X, y):
 
 def train_model_combine(news, hisprice, y, prices):
 	news_train, news_test, hisprice_train, hisprice_test, y_train, y_test = train_test_split(news, hisprice, y, test_size = 0.33, random_state = seed)
-	hisprice_train = np.reshape(hisprice_train, (hisprice_train.shape[0], 1, hisprice_train.shape[1]))
-	hisprice_test = np.reshape(hisprice_test, (hisprice_test.shape[0], 1, hisprice_test.shape[1]))
+	# hisprice_train = np.reshape(hisprice_train, (hisprice_train.shape[0], 1, hisprice_train.shape[1]))
+	# hisprice_test = np.reshape(hisprice_test, (hisprice_test.shape[0], 1, hisprice_test.shape[1]))
 
 
 
@@ -110,32 +111,36 @@ def train_model_combine(news, hisprice, y, prices):
 	left_branch = Sequential()
 	left_branch.add(Embedding(top_words, embedding_vecor_length, input_length = max_news_length))
 	left_branch.add(LSTM(output_dim = 50, dropout_W = 0.5, dropout_U = 0.5, return_sequences = False))
-	# left_branch.add(Dense(100, activation='sigmoid'))
+	left_branch.add(Dense(10, activation='relu'))
 
 	right_branch = Sequential()
-	right_branch.add(LSTM(output_dim = 50, activation='sigmoid', input_dim = look_back, return_sequences = False))
-	# right_branch.add(Dense(100, activation='sigmoid'))
+	# right_branch.add(LSTM(output_dim = 50, activation='sigmoid', input_dim = look_back, return_sequences = False))
+	right_branch.add(Dense(10, activation='relu', input_dim = 1))
 
 	merged = Merge([left_branch, right_branch], mode = 'concat')
 	predict_price = Sequential()
 	predict_price.add(merged)
+	predict_price.add(Reshape((1, 20)))
+	predict_price.add(LSTM(output_dim = 10, return_sequences = False, input_shape = (1, 20)))
 	# predict_price.add(Dense(50, activation = 'relu'))
-	predict_price.add(Dense(1, activation = 'softmax'))
+	predict_price.add(Dense(1))
 	predict_price.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
 	print(predict_price.summary())
 
-	predict_price.fit([news_train, hisprice_train], y_train, nb_epoch=1, batch_size = 64)
+	predict_price.fit([news_train, hisprice_train], y_train, nb_epoch=50, batch_size = 64)
 	
 	# make predictions
 	train_predict = predict_price.predict([news_train, hisprice_train])
 	test_predict = predict_price.predict([news_test, hisprice_test])
+
 
 	# invert predictions
 	trainPredict = scaler.inverse_transform(train_predict)
 	trainY = scaler.inverse_transform([y_train])
 	testPredict = scaler.inverse_transform(test_predict)
 	testY = scaler.inverse_transform([y_test])
-
+	print trainPredict, trainY
+	print testPredict, testY
 
 	# calculate root mean squared error
 	trainScore = math.sqrt(mean_squared_error(trainY[0], trainPredict[:,0]))
@@ -144,19 +149,21 @@ def train_model_combine(news, hisprice, y, prices):
 	print('Test Score: %.2f RMSE' % (testScore))
 
 
-	# shift train predictions for plotting
+	shift train predictions for plotting
 	prices = np.asarray([prices]).T
 	trainPredictPlot = np.empty_like(prices)
 	trainPredictPlot[:, :] = np.nan
 	trainPredictPlot[look_back:len(trainPredict)+look_back, :] = trainPredict
+	print trainPredictPlot
 
 	# shift test predictions for plotting
 	testPredictPlot = np.empty_like(prices)
 	testPredictPlot[:, :] = np.nan
 	testPredictPlot[len(trainPredict)+(look_back):len(prices), :] = testPredict
+	print testPredictPlot
 
 	# plot baseline and predictions
-	plt.plot(scaler.inverse_transform(prices))
+	plt.plot(scaler.inverse_transform(prices[::-1]))
 	plt.plot(trainPredictPlot)
 	plt.plot(testPredictPlot)
 	plt.show()
