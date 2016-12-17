@@ -23,7 +23,7 @@ from sklearn.metrics import mean_squared_error
 
 # LOADING DATASET
 os.getcwd() # Setting directory
-os.chdir("D:/MBA Journey/2016 - Fall Quarter/CSC240 - Data Mining/Project 2/CSC440")
+os.chdir("..... ")
 data = pd.read_csv(os.getcwd() + "/data/combined.csv") # load headlines data
 djia_data = pd.read_csv(os.getcwd() + "/data/djia.csv") # load DJIA prices
 headlines_keys_sorted = data.keys()[2:len(data.keys())]
