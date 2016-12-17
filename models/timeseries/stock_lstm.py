@@ -61,7 +61,7 @@ model = Sequential()
 model.add(LSTM(4, input_dim=look_back))
 model.add(Dense(1))
 model.compile(loss='mean_squared_error', optimizer='adam')
-model.fit(trainX, trainY, nb_epoch=100, batch_size=1, verbose=2)
+model.fit(trainX[::-1], trainY[::-1], nb_epoch=30, batch_size=30, verbose=2)
 
 #make prediction
 # make predictions

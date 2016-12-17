@@ -304,6 +304,16 @@ train_swn_score
 test_swn_score = math.sqrt(mean_squared_error(test_pred_swn,test_swn))
 test_swn_score
 
+line1, = plt.plot(x[1:], np.append(test_pred_swn, train_pred_swn),
+                  label='prediction')
+line2, = plt.plot(x[:-1], np.append(test_swn, train_swn), 
+                  label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prices + SWN + LSTM')
+plt.savefig("swn_LSTM.png")
+plt.show()
+
 # Vader 
 # Invert predictions
 train_pred_vad = djia_scaler.inverse_transform(trainPredict_vad[::-1])
@@ -316,6 +326,15 @@ train_vad_score
 test_vad_score = math.sqrt(mean_squared_error(test_pred_vad,test_vad))
 test_vad_score
 
+line1, = plt.plot(x[1:], np.append(test_pred_vad, train_pred_vad),
+                  label='prediction')
+line2, = plt.plot(x[:-1], np.append(test_vad, train_vad), 
+                  label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prices + VADER + LSTM')
+plt.savefig("vad_LSTM.png")
+plt.show()
 
 # SIMPLE RNN MODELS
 # SentiwordNet
@@ -365,6 +384,15 @@ train_swnb_score
 test_swnb_score = math.sqrt(mean_squared_error(test_pred_swnb,test_swnb))
 test_swnb_score
 
+line1, = plt.plot(x[1:], np.append(test_pred_swnb, train_pred_swnb),
+                  label='prediction')
+line2, = plt.plot(x[:-1], np.append(test_swnb, train_swnb), 
+                  label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prices + SWN + SimpleRNN')
+plt.savefig("swn_RNN.png")
+plt.show()
 
 
 # Vader
@@ -413,6 +441,17 @@ train_vadb_score
 test_vadb_score = math.sqrt(mean_squared_error(test_pred_vadb,test_vadb))
 test_vadb_score      
 
+line1, = plt.plot(x[1:], np.append(test_pred_vadb, train_pred_vadb),
+                  label='prediction')
+line2, = plt.plot(x[:-1], np.append(test_vadb, train_vadb), 
+                  label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prices + VADER + SimpleRNN')
+plt.savefig("vad_RNN.png")
+plt.show()
+
+
 # LSTM MODEL WITHOUT NEWS HEADLINES AS INPUTS
 dataset = djia_data.values[:,4:5].astype("float32")
 djia_scaled = djia_scaler.fit_transform(dataset)
@@ -453,8 +492,16 @@ train_LSTM_score
 test_LSTM_score = math.sqrt(mean_squared_error(test_pred_LSTM,test_LSTM))
 test_LSTM_score
 
-plt.plot(x[1:],np.append(test_pred_LSTM,train_pred_LSTM))
-plt.plot(x[:-1],np.append(test_LSTM,train_LSTM))
+line1, = plt.plot(x[1:], np.append(test_pred_LSTM, train_pred_LSTM),
+                  label='prediction')
+line2, = plt.plot(x[:-1], np.append(test_LSTM, train_LSTM), 
+                  label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prediction using Historical Prices Only')
+plt.savefig("histprices_LSTM.png")
+plt.show()
+
 
 # Sequential model with SimpleRNN
 model_RNN = Sequential()
@@ -484,5 +531,75 @@ train_RNN_score
 test_RNN_score = math.sqrt(mean_squared_error(test_pred_RNN,test_RNN))
 test_RNN_score
 
+line1, = plt.plot(x[1:], np.append(test_pred_RNN, train_pred_RNN),
+                  label='prediction')
+line2, = plt.plot(x[:-1], np.append(test_RNN, train_RNN), 
+                  label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prediction using Historical Prices Only')
+plt.savefig("histprices_RNN.png")
+plt.show()
+
+# LINEAR REGRESSION
+# SentiwordNet
+from sklearn.linear_model import LinearRegression
+
+trainX_swnl = swn_df2.values[test_size:len(swn_df2.values)]
+trainY_swnl = djia_data.loc[test_size:len(swn_df2.values),'Close'].values
+testX_swnl = swn_df2.values[0:test_size]
+testY_swnl = djia_data.loc[0:test_size-1,'Close'].values
 
 
+lin_reg = LinearRegression()
+start = dt.datetime.now()
+lin_reg.fit(trainX_swnl[::-1],trainY_swnl[::-1])
+runtime_swnl = dt.datetime.now() - start
+print(runtime_swnl)
+
+tsPredict_swnl = lin_reg.predict(testX_swnl[::-1])
+trPredict_swnl = lin_reg.predict(trainX_swnl[::-1])
+
+### Save Figure
+line1, = plt.plot(x, np.append(tsPredict_swnl[::-1],trPredict_swnl[::-1]),
+                  label='prediction')
+line2, = plt.plot(x, np.append(testY_swnl,trainY_swnl), label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prediction using Linear Regression & SWN')
+plt.savefig("linregSWN.png")
+plt.show()
+
+train_pred_swnl = trPredict_swnl[::-1]
+test_pred_swnl = tsPredict_swnl[::-1]
+train_swnl_score = math.sqrt(mean_squared_error(train_pred_swnl,trainY_swnl))
+train_swnl_score
+test_swnl_score = math.sqrt(mean_squared_error(test_pred_swnl,testY_swnl))
+test_swnl_score
+
+# VADER
+trainX_vadl = vad_df2.values[test_size:len(vad_df2.values)]
+trainY_vadl = djia_data.loc[test_size:len(vad_df2.values),'Close'].values
+testX_vadl = vad_df2.values[0:test_size]
+testY_vadl = djia_data.loc[0:test_size-1,'Close'].values
+
+lin_reg_vadl = LinearRegression()
+start = dt.datetime.now()
+lin_reg_vadl.fit(trainX_vadl[::-1],trainY_vadl[::-1])
+runtime_vadl = dt.datetime.now() - start
+print(runtime_vadl)
+
+tsPredict_vadl = lin_reg_vadl.predict(testX_vadl[::-1])
+trPredict_vadl = lin_reg_vadl.predict(trainX_vadl[::-1])
+
+### Save Figure
+line1, = plt.plot(x, np.append(tsPredict_vadl[::-1],trPredict_vadl[::-1]),
+                  label='prediction')
+line2, = plt.plot(x, np.append(testY_vadl,trainY_vadl), label = 'actual')
+legend = plt.legend(handles=[line1,line2],loc=2)
+plt.ylabel("DJIA Index")
+plt.title('Prediction using Linear Regression & VADER')
+plt.savefig("linregVADER.png")
+plt.show()
+
+plt.plot(tsPredict_vadl)
