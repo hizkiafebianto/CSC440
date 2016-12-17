@@ -80,7 +80,7 @@ def train_model_dropout(X, y):
 	model.add(Dense(1, activation='sigmoid'))
 	model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 	# print(model.summary())
-	model.fit(X_train, y_train, nb_epoch = 50, batch_size = 64)
+	model.fit(X_train, y_train, nb_epoch = 3, batch_size = 64)
 	scores = model.evaluate(X_test, y_test, verbose=0)
 	print("Accuracy: %.2f%%" % (scores[1]*100))
 
@@ -88,9 +88,9 @@ def train_model_convnet(X, y):
 	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.33, random_state = seed)
 	model = Sequential()
 	model.add(Embedding(top_words, embedding_vecor_length, input_length = max_news_length))
-	model.add(Convolution1D(nb_filter = 32, filter_length = 3, border_mode = 'same', activation = 'relu'))
+	model.add(Convolution1D(nb_filter = 64, filter_length = 15, border_mode = 'same', activation = 'relu'))
 	model.add(MaxPooling1D(pool_length=2))
-	model.add(LSTM(100))
+	model.add(LSTM(50))
 	model.add(Dense(1, activation='sigmoid'))
 	model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 	# print(model.summary())
@@ -149,7 +149,7 @@ def train_model_combine(news, hisprice, y, prices):
 	print('Test Score: %.2f RMSE' % (testScore))
 
 
-	shift train predictions for plotting
+	# shift train predictions for plotting
 	prices = np.asarray([prices]).T
 	trainPredictPlot = np.empty_like(prices)
 	trainPredictPlot[:, :] = np.nan
@@ -169,11 +169,13 @@ def train_model_combine(news, hisprice, y, prices):
 	plt.show()
 
 if __name__ == "__main__":
-	news, hisprice, y = load_data_nonclass(sys.argv[1], sys.argv[2])
-	prices = preprocess.read_price(sys.argv[2])
-	train_model_combine(news, hisprice, y, prices)
-	# X, y = load_data_class(sys.argv[1], sys.argv[2])
+	# news, hisprice, y = load_data_nonclass(sys.argv[1], sys.argv[2])
+	# prices = preprocess.read_price(sys.argv[2])
+	# train_model_combine(news, hisprice, y, prices)
+	X, y = load_data_class(sys.argv[1], sys.argv[2])
 	# train_model_no_dropout(X, y)
+	train_model_dropout(X, y)
+	# train_model_convnet(X, y)
 
 
 

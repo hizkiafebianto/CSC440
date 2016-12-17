@@ -10,19 +10,27 @@ import numpy as np
 import nltk
 import re
 import skipthoughts
+import autoencoder
 import h5py
+import pandas
 import collections
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 from keras.layers import Input, Embedding, merge, Flatten, Dense, SimpleRNN
 from keras.models import Model
 from keras.preprocessing import sequence
+from keras.datasets import imdb
+from nltk.corpus import stopwords
+
+
 
 
 
 tokenizer = RegexpTokenizer(r'\w+')
+stop_words = set(stopwords.words('english'))
 model_skipthoughts = skipthoughts.load_model()
-max_news_length = 700
+max_news = 1989
+max_news_length = 445
 embedding_dim = 4800
 
 
@@ -40,33 +48,52 @@ def string_clean(sentence):
 	sentence = re.sub("[^a-zA-Z]"," ", sentence)
 	sentence = re.sub("b"," ", sentence)
 	words = tokenizer.tokenize(sentence.strip().lower())
+	words = [word for word in words if len(word) > 2 and word not in stop_words]
 	return words
 
 
 def news_to_sentences(newslist):
+	global max_news_length
 	sentences = list()
 	for news in newslist:
 		sentence = list()
 		for headline in news:
 			sentence += string_clean(headline)
+		if len(sentence) > max_news_length:
+			max_news_length = len(sentence)
 		sentences.append(sentence)
 	return sentences
+
 
 
 def word_embedding(newslist):
 	embed_news = list()
 	sentences = news_to_sentences(newslist)
+	index = 0
 	for sentence in sentences[0:1]:
+		# sentence_pad = sequence.pad_sequences(sentence, maxlen = max_news_length)
 		vector = skipthoughts.encode(model_skipthoughts, sentence)
-		vector_pad = np.zeros((max_news_length, embedding_dim))
-		vector_pad[:vector.shape[0],:vector.shape[1]] = vector
-		embed_news.append(vector_pad)
-	return embed_news
+		print vector
+		save_hdf5(vector)
+		vector_encoded = autoencoder.convnet_encoder(vector)
+		print vector_encoded
+		# vector_pad = np.zeros((max_news_length, embedding_dim))
+		# vector_pad[:vector.shape[0],:vector.shape[1]] = vector
+		# embed_news.append(vector_pad)
+		# embed_news_array = np.asarray(embed_news, dtype = 'int32')
+		# save_hdf5(embed_news)
+		index += 1
+		# print 'Saving embedded vector...'
+		print 'Completed %d vectors...' % index
+	return embed_news_array
+
 
 
 def save_hdf5(data):
 	with h5py.File('embednews.h5', mode = 'w') as hf:
 		hf.create_dataset('data', data = data)
+		hf.close()
+
 
 
 def load_hdf5(filename):
@@ -130,10 +157,19 @@ def main():
 
 if __name__ == "__main__":
 	
-	# newslist = read_csv(sys.argv[1])
-	# embed_news = word_embedding(newslist)
-	# save_hdf5(embed_news)
-	# embed_news = load_hdf5('embednews.h5')
+	newslist = read_csv(sys.argv[1])
+	# sentences = news_to_sentences(newslist)
+	# print max_length, len(word_dictionary)
+	# (X_train, y_train), (X_test, y_test) = imdb.load_data(nb_words=30000)
+	# print X_test
+	# embed_news_array = word_embedding(newslist)
+	# save_hdf5(embed_news_array)
+	embed_news = load_hdf5('embednews.h5')
+	print embed_news
+
+
+
+
 
 
 
